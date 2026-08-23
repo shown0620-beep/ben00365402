@@ -7,9 +7,10 @@ export const formatMoney = (value: number, signed = false) => {
 };
 
 export const todayISO = () => {
-  const now = new Date();
-  const taipei = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
-  return taipei.toISOString().slice(0, 10);
+  // Taiwan stays on UTC+8 year-round. Shifting the timestamp before formatting
+  // avoids reparsing locale-dependent date strings, which can fail in Hermes.
+  const taipeiTimestamp = Date.now() + 8 * 60 * 60 * 1000;
+  return new Date(taipeiTimestamp).toISOString().slice(0, 10);
 };
 
 export const displayDate = (date: string) => date.replaceAll('-', '/');
@@ -87,5 +88,4 @@ export const getSummary = (entries: BookkeepingEntry[]) => {
     unpaidExpenseAmount: unpaidExpense.reduce((sum, entry) => sum + entry.grossAmount, 0),
   };
 };
-
 
