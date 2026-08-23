@@ -16,8 +16,8 @@
 
 ## 技術架構
 
-- Expo SDK 57
-- React Native 0.86
+- Expo SDK 54（支援實體 iPhone 的 Expo Go）
+- React Native 0.81
 - React 19
 - TypeScript
 - Expo Router
@@ -46,5 +46,4 @@ pnpm ios
 ## 專案狀態
 
 目前為可執行的 MVP。後續可擴充雲端備份、多人同步、多門市、發票掃描與會計匯出。
-
 
