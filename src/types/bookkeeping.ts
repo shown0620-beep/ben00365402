@@ -1,5 +1,6 @@
 export type EntryType = 'income' | 'purchase' | 'staff' | 'operation';
 export type PaymentStatus = 'paid' | 'unpaid';
+export type PaymentMethod = '現金' | '信用卡' | '行動支付' | '銀行轉帳' | '外送平台代收' | '其他';
 
 export type BookkeepingEntry = {
   id: number;
@@ -11,7 +12,9 @@ export type BookkeepingEntry = {
   grossAmount: number;
   feeAmount: number;
   netAmount: number;
+  paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  notes: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +29,8 @@ export type Category = {
 };
 
 export type PeriodKey = 'today' | 'week' | 'month' | 'lastMonth' | 'year' | 'all';
+
+export const PAYMENT_METHODS: PaymentMethod[] = ['現金', '信用卡', '行動支付', '銀行轉帳', '外送平台代收', '其他'];
 
 export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   income: '收入',
@@ -49,5 +54,3 @@ export const PERIOD_LABELS: Record<PeriodKey, string> = {
   year: '今年',
   all: '全部',
 };
-
-
