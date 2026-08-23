@@ -35,7 +35,9 @@ export default function EditEntryScreen() {
     grossAmount: entry.grossAmount,
     feeAmount: entry.feeAmount,
     netAmount: entry.netAmount,
+    paymentMethod: entry.paymentMethod,
     paymentStatus: entry.paymentStatus,
+    notes: entry.notes,
   };
 
   const confirmDelete = () => {
@@ -92,5 +94,3 @@ const styles = StyleSheet.create({
   statusAction: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.warningSoft },
   statusActionText: { color: colors.warning, fontSize: 14, fontWeight: '900' },
 });
-
-
