@@ -37,13 +37,11 @@ export default function RecordsScreen() {
   const filtered = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase('zh-TW');
     return entries.filter((entry) => {
-      const typeMatch =
-        typeFilter === 'all' ||
-        (typeFilter === 'expense' ? entry.type !== 'income' : entry.type === typeFilter);
+      const typeMatch = typeFilter === 'all' || (typeFilter === 'expense' ? entry.type !== 'income' : entry.type === typeFilter);
       const statusMatch = statusFilter === 'all' || entry.paymentStatus === statusFilter;
       const textMatch =
         !keyword ||
-        [entry.category, entry.source, entry.description, ENTRY_TYPE_LABELS[entry.type]]
+        [entry.category, entry.source, entry.description, entry.paymentMethod, entry.notes, ENTRY_TYPE_LABELS[entry.type]]
           .join(' ')
           .toLocaleLowerCase('zh-TW')
           .includes(keyword);
@@ -61,7 +59,7 @@ export default function RecordsScreen() {
         <TextInput
           accessibilityLabel="搜尋紀錄"
           onChangeText={setSearch}
-          placeholder="搜尋分類、來源或說明"
+          placeholder="搜尋分類、來源、付款方式或備註"
           placeholderTextColor={colors.inkMuted}
           style={styles.searchInput}
           value={search}
@@ -76,10 +74,7 @@ export default function RecordsScreen() {
 
       <View style={styles.statusRow}>
         {(['all', 'paid', 'unpaid'] as StatusFilter[]).map((status) => (
-          <Pressable
-            key={status}
-            onPress={() => setStatusFilter(status)}
-            style={[styles.statusButton, statusFilter === status && styles.statusButtonActive]}>
+          <Pressable key={status} onPress={() => setStatusFilter(status)} style={[styles.statusButton, statusFilter === status && styles.statusButtonActive]}>
             <Text style={[styles.statusLabel, statusFilter === status && styles.statusLabelActive]}>
               {status === 'all' ? '所有狀態' : status === 'paid' ? '已完成' : '待處理'}
             </Text>
@@ -136,5 +131,3 @@ const styles = StyleSheet.create({
   resultNet: { fontSize: 15, fontWeight: '900' },
   listCard: { paddingTop: 2, paddingBottom: 2 },
 });
-
-

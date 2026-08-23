@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, radius } from '@/constants/app-theme';
 import { useBookkeeping } from '@/context/bookkeeping-context';
-import { EntryDraft, EntryType, ENTRY_TYPE_EMOJI, ENTRY_TYPE_LABELS, PaymentStatus } from '@/types/bookkeeping';
+import {
+  EntryDraft,
+  EntryType,
+  ENTRY_TYPE_EMOJI,
+  ENTRY_TYPE_LABELS,
+  PaymentStatus,
+  PAYMENT_METHODS,
+} from '@/types/bookkeeping';
 import { formatMoney, todayISO } from '@/utils/format';
 import { PrimaryButton, SectionTitle } from './ui';
 
@@ -18,7 +25,9 @@ const emptyDraft = (): EntryDraft => ({
   grossAmount: 0,
   feeAmount: 0,
   netAmount: 0,
+  paymentMethod: '現金',
   paymentStatus: 'paid',
+  notes: '',
 });
 
 type EntryFormProps = {
@@ -30,9 +39,12 @@ type EntryFormProps = {
 
 export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSubmit, onSubmitted }: EntryFormProps) {
   const { categories } = useBookkeeping();
+  const amountRef = useRef<TextInput>(null);
   const [draft, setDraft] = useState<EntryDraft>(initialValue ?? emptyDraft());
   const [grossInput, setGrossInput] = useState(initialValue?.grossAmount ? String(initialValue.grossAmount) : '');
   const [feeInput, setFeeInput] = useState(initialValue?.feeAmount ? String(initialValue.feeAmount) : '');
+  const [netInput, setNetInput] = useState(initialValue?.netAmount ? String(initialValue.netAmount) : '');
+  const [netTouched, setNetTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const availableCategories = useMemo(
@@ -48,11 +60,23 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
 
   const gross = Number(grossInput.replaceAll(',', '')) || 0;
   const fee = draft.type === 'income' ? Number(feeInput.replaceAll(',', '')) || 0 : 0;
-  const net = Math.max(gross - fee, 0);
+  const autoNet = Math.max(gross - fee, 0);
+  const net = draft.type === 'income' ? Number(netInput.replaceAll(',', '')) || 0 : gross;
+
+  useEffect(() => {
+    if (draft.type === 'income' && !netTouched) setNetInput(autoNet ? String(autoNet) : '');
+  }, [autoNet, draft.type, netTouched]);
 
   const changeType = (type: EntryType) => {
     setDraft((current) => ({ ...current, type, category: '', feeAmount: 0, netAmount: 0 }));
-    if (type !== 'income') setFeeInput('');
+    setFeeInput('');
+    setNetInput('');
+    setNetTouched(false);
+  };
+
+  const chooseCategory = (name: string) => {
+    setDraft((current) => ({ ...current, category: name }));
+    setTimeout(() => amountRef.current?.focus(), 80);
   };
 
   const save = async () => {
@@ -72,14 +96,25 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
       Alert.alert('抽成金額過高', '手續費／平台抽成不可大於營業額。');
       return;
     }
+    if (draft.type === 'income' && net < 0) {
+      Alert.alert('實際入帳不正確', '實際入帳不可小於 0。');
+      return;
+    }
 
     setSaving(true);
     try {
-      await onSubmit({ ...draft, grossAmount: gross, feeAmount: fee, netAmount: draft.type === 'income' ? net : gross });
+      await onSubmit({
+        ...draft,
+        grossAmount: gross,
+        feeAmount: fee,
+        netAmount: draft.type === 'income' ? net : gross,
+      });
       if (!initialValue) {
         setDraft(emptyDraft());
         setGrossInput('');
         setFeeInput('');
+        setNetInput('');
+        setNetTouched(false);
       }
       onSubmitted?.();
     } finally {
@@ -119,10 +154,7 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
         {availableCategories.map((category) => {
           const active = category.name === draft.category;
           return (
-            <Pressable
-              key={category.id}
-              onPress={() => setDraft((current) => ({ ...current, category: category.name }))}
-              style={[styles.categoryChip, active && styles.categoryChipActive]}>
+            <Pressable key={category.id} onPress={() => chooseCategory(category.name)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
               <Text style={[styles.categoryLabel, active && styles.categoryLabelActive]}>{category.name}</Text>
             </Pressable>
           );
@@ -143,6 +175,7 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
       <View style={styles.moneyInputWrap}>
         <Text style={styles.currency}>NT$</Text>
         <TextInput
+          ref={amountRef}
           accessibilityLabel="金額"
           keyboardType="decimal-pad"
           onChangeText={setGrossInput}
@@ -168,12 +201,42 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
               value={feeInput}
             />
           </View>
+
+          <FieldLabel>實際入帳</FieldLabel>
+          <View style={styles.moneyInputWrap}>
+            <Text style={styles.currency}>NT$</Text>
+            <TextInput
+              accessibilityLabel="實際入帳"
+              keyboardType="decimal-pad"
+              onChangeText={(value) => {
+                setNetTouched(true);
+                setNetInput(value);
+              }}
+              placeholder="0"
+              placeholderTextColor={colors.inkMuted}
+              style={styles.moneyInput}
+              value={netInput}
+            />
+          </View>
+          <Text style={styles.helperText}>預設為營業額－抽成；若實際入帳不同可直接修改。</Text>
           <View style={styles.netRow}>
-            <Text style={styles.netLabel}>預計實際入帳</Text>
+            <Text style={styles.netLabel}>目前實際入帳</Text>
             <Text style={styles.netValue}>{formatMoney(net)}</Text>
           </View>
         </>
       ) : null}
+
+      <FieldLabel>{draft.type === 'income' ? '收款方式' : '付款方式'}</FieldLabel>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+        {PAYMENT_METHODS.map((method) => {
+          const active = draft.paymentMethod === method;
+          return (
+            <Pressable key={method} onPress={() => setDraft((current) => ({ ...current, paymentMethod: method }))} style={[styles.categoryChip, active && styles.categoryChipActive]}>
+              <Text style={[styles.categoryLabel, active && styles.categoryLabelActive]}>{method}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <FieldLabel>{draft.type === 'income' ? '收款狀態' : '付款狀態'}</FieldLabel>
       <View style={styles.segment}>
@@ -181,10 +244,7 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
           const active = draft.paymentStatus === status;
           const label = status === 'paid' ? (draft.type === 'income' ? '已收款' : '已付款') : draft.type === 'income' ? '尚未收款' : '尚未付款';
           return (
-            <Pressable
-              key={status}
-              onPress={() => setDraft((current) => ({ ...current, paymentStatus: status }))}
-              style={[styles.segmentButton, active && styles.segmentButtonActive]}>
+            <Pressable key={status} onPress={() => setDraft((current) => ({ ...current, paymentStatus: status }))} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
               <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>{label}</Text>
             </Pressable>
           );
@@ -197,11 +257,24 @@ export function EntryForm({ initialValue, submitLabel = '儲存這一筆', onSub
         multiline
         numberOfLines={3}
         onChangeText={(description) => setDraft((current) => ({ ...current, description }))}
-        placeholder="補充這筆帳的細節"
+        placeholder="例如：8/23 晚餐營業額、蔬菜進貨"
         placeholderTextColor={colors.inkMuted}
         style={[styles.input, styles.multiline]}
         textAlignVertical="top"
         value={draft.description}
+      />
+
+      <FieldLabel>備註（選填）</FieldLabel>
+      <TextInput
+        accessibilityLabel="備註"
+        multiline
+        numberOfLines={3}
+        onChangeText={(notes) => setDraft((current) => ({ ...current, notes }))}
+        placeholder="其他需要記住的資訊"
+        placeholderTextColor={colors.inkMuted}
+        style={[styles.input, styles.multiline]}
+        textAlignVertical="top"
+        value={draft.notes}
       />
 
       <View style={styles.submit}>
@@ -233,6 +306,7 @@ const styles = StyleSheet.create({
   moneyInputWrap: { flexDirection: 'row', alignItems: 'center', minHeight: 64, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16 },
   currency: { color: colors.inkMuted, fontSize: 16, fontWeight: '800', marginRight: 10 },
   moneyInput: { flex: 1, color: colors.ink, fontSize: 27, fontWeight: '900', textAlign: 'right' },
+  helperText: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: 8 },
   netRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.incomeSoft, borderRadius: radius.md, padding: 15, marginTop: 10 },
   netLabel: { color: colors.income, fontWeight: '800' },
   netValue: { color: colors.income, fontSize: 18, fontWeight: '900' },
@@ -243,5 +317,3 @@ const styles = StyleSheet.create({
   segmentLabelActive: { color: colors.ink, fontWeight: '900' },
   submit: { marginTop: 28 },
 });
-
-

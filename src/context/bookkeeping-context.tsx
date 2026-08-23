@@ -1,7 +1,7 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { BookkeepingEntry, Category, EntryDraft, EntryType } from '@/types/bookkeeping';
+import { BookkeepingEntry, Category, EntryDraft, EntryType, PaymentMethod } from '@/types/bookkeeping';
 
 type EntryRow = {
   id: number;
@@ -13,7 +13,9 @@ type EntryRow = {
   gross_amount: number;
   fee_amount: number;
   net_amount: number;
+  payment_method: PaymentMethod;
   payment_status: 'paid' | 'unpaid';
+  notes: string;
   created_at: string;
   updated_at: string;
 };
@@ -50,7 +52,9 @@ const mapEntry = (row: EntryRow): BookkeepingEntry => ({
   grossAmount: row.gross_amount,
   feeAmount: row.fee_amount,
   netAmount: row.net_amount,
+  paymentMethod: row.payment_method || '現金',
   paymentStatus: row.payment_status,
+  notes: row.notes || '',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -82,8 +86,8 @@ export function BookkeepingProvider({ children }: PropsWithChildren) {
       const now = new Date().toISOString();
       await db.runAsync(
         `INSERT INTO entries
-          (type, date, category, source, description, gross_amount, fee_amount, net_amount, payment_status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (type, date, category, source, description, gross_amount, fee_amount, net_amount, payment_method, payment_status, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         draft.type,
         draft.date,
         draft.category,
@@ -92,7 +96,9 @@ export function BookkeepingProvider({ children }: PropsWithChildren) {
         draft.grossAmount,
         draft.feeAmount,
         draft.netAmount,
+        draft.paymentMethod,
         draft.paymentStatus,
+        draft.notes.trim(),
         now,
         now,
       );
@@ -106,7 +112,7 @@ export function BookkeepingProvider({ children }: PropsWithChildren) {
       await db.runAsync(
         `UPDATE entries SET
           type = ?, date = ?, category = ?, source = ?, description = ?,
-          gross_amount = ?, fee_amount = ?, net_amount = ?, payment_status = ?, updated_at = ?
+          gross_amount = ?, fee_amount = ?, net_amount = ?, payment_method = ?, payment_status = ?, notes = ?, updated_at = ?
          WHERE id = ?`,
         draft.type,
         draft.date,
@@ -116,7 +122,9 @@ export function BookkeepingProvider({ children }: PropsWithChildren) {
         draft.grossAmount,
         draft.feeAmount,
         draft.netAmount,
+        draft.paymentMethod,
         draft.paymentStatus,
+        draft.notes.trim(),
         new Date().toISOString(),
         id,
       );
@@ -181,18 +189,7 @@ export function BookkeepingProvider({ children }: PropsWithChildren) {
       toggleCategory,
       refresh,
     }),
-    [
-      entries,
-      categories,
-      loading,
-      addEntry,
-      updateEntry,
-      deleteEntry,
-      togglePayment,
-      addCategory,
-      toggleCategory,
-      refresh,
-    ],
+    [entries, categories, loading, addEntry, updateEntry, deleteEntry, togglePayment, addCategory, toggleCategory, refresh],
   );
 
   return <BookkeepingContext.Provider value={value}>{children}</BookkeepingContext.Provider>;
@@ -203,5 +200,3 @@ export function useBookkeeping() {
   if (!context) throw new Error('useBookkeeping must be used inside BookkeepingProvider');
   return context;
 }
-
-
